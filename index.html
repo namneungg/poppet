@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Pop Cat Mobile Battle</title>
+  <title>Pop Cat 2-Player Co-op</title>
   <style>
     * {
       box-sizing: border-box;
@@ -13,7 +13,7 @@
       padding: 0;
     }
     body {
-      background-color: #2b2b2b;
+      background-color: #1e1e24;
       color: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
@@ -22,10 +22,10 @@
       justify-content: space-between;
       height: 100vh;
       overflow: hidden;
-      touch-action: manipulation;
+      touch-action: none; /* ป้องกันการเลื่อนหรือซูมหน้าจอ */
     }
     .header {
-      margin-top: 25px;
+      margin-top: 20px;
       text-align: center;
     }
     .score-display {
@@ -33,20 +33,13 @@
       font-weight: 800;
       letter-spacing: 2px;
       color: #ffe600;
-      text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      text-shadow: 0 4px 12px rgba(0,0,0,0.6);
     }
-    .team-select {
-      margin-top: 8px;
-    }
-    select {
-      font-size: 1rem;
-      padding: 6px 14px;
-      border-radius: 20px;
-      border: 2px solid #ffe600;
-      background: #1e1e1e;
-      color: #fff;
-      font-weight: bold;
-      outline: none;
+    .hint-text {
+      font-size: 0.95rem;
+      color: #00d2d3;
+      margin-top: 4px;
+      font-weight: 600;
     }
     .cat-container {
       width: 100%;
@@ -54,18 +47,64 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      cursor: pointer;
+      position: relative;
     }
     .cat-img {
-      max-width: 80%;
-      max-height: 55vh;
+      max-width: 75%;
+      max-height: 45vh;
       object-fit: contain;
       pointer-events: none;
     }
-    .status-bar {
-      margin-bottom: 20px;
-      font-size: 0.9rem;
-      color: #aaa;
+    /* แผงควบคุม 2 ปุ่มกดสำหรับ 2 คน */
+    .controls-container {
+      width: 100%;
+      display: flex;
+      justify-content: space-around;
+      padding: 0 16px 24px 16px;
+      gap: 16px;
+    }
+    .player-btn {
+      flex: 1;
+      height: 110px;
+      border-radius: 20px;
+      border: 4px solid #ffffff33;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.05s ease, background-color 0.1s ease;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+    }
+    /* ปุ่มผู้เล่นที่ 1 */
+    #btnP1 {
+      background: linear-gradient(145deg, #ff4757, #c0392b);
+    }
+    #btnP1.active {
+      background: #2ed573;
+      border-color: #7bed9f;
+      transform: scale(0.94);
+    }
+    /* ปุ่มผู้เล่นที่ 2 */
+    #btnP2 {
+      background: linear-gradient(145deg, #2e86de, #1e3799);
+    }
+    #btnP2.active {
+      background: #2ed573;
+      border-color: #7bed9f;
+      transform: scale(0.94);
+    }
+    .btn-status {
+      font-size: 0.8rem;
+      margin-top: 4px;
+      opacity: 0.85;
+    }
+    .sync-status {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 8px;
     }
   </style>
 </head>
@@ -73,47 +112,59 @@
 
   <div class="header">
     <div class="score-display" id="score">0</div>
-    <div class="team-select">
-      <label for="locationId">เลือกทีม: </label>
-      <select id="locationId">
-        <option value="location_A">สถานที่ 1 (ทีม A)</option>
-        <option value="location_B">สถานที่ 2 (ทีม B)</option>
-      </select>
-    </div>
+    <div class="hint-text">★ ต้องกด 2 ปุ่มพร้อมกันแต้มถึงจะขึ้น! ★</div>
   </div>
 
-  <div class="cat-container" id="catBtn">
+  <div class="cat-container">
     <img id="catPic" class="cat-img" src="https://popcat.click/img/p.1e9d00be.png" alt="Pop Cat Closed">
   </div>
 
-  <div class="status-bar" id="syncStatus">พร้อมเล่น! แตะหน้าจอเพื่อ Pop</div>
+  <div class="sync-status" id="syncStatus">ระบบพร้อมเล่น</div>
+
+  <!-- ปุ่มกดสำหรับ 2 ผู้เล่น -->
+  <div class="controls-container">
+    <div class="player-btn" id="btnP1">
+      <div>คนซ้าย (P1)</div>
+      <div class="btn-status" id="statusP1">ยังไม่กด</div>
+    </div>
+    <div class="player-btn" id="btnP2">
+      <div>คนขวา (P2)</div>
+      <div class="btn-status" id="statusP2">ยังไม่กด</div>
+    </div>
+  </div>
 
   <script>
-    // ใส่ URL ของ Google Apps Script Web App ที่นี่
+    // URL สำหรับซิงก์ Google Sheets (ถ้ายังไม่ใช้ให้ปล่อยไว้ได้)
     const GAS_URL = "YOUR_GAS_URL_HERE";
 
     let score = 0;
     let pendingClicks = 0;
-    const scoreElement = document.getElementById("score");
+    let isP1Down = false;
+    let isP2Down = false;
+    let isTriggered = false; // ป้องกันการนับแต้มไหลเมื่อกดค้าง
+
+    const scoreDisplay = document.getElementById("score");
     const catPic = document.getElementById("catPic");
-    const catBtn = document.getElementById("catBtn");
-    const statusText = document.getElementById("syncStatus");
-    const locationSelect = document.getElementById("locationId");
+    const btnP1 = document.getElementById("btnP1");
+    const btnP2 = document.getElementById("btnP2");
+    const statusP1 = document.getElementById("statusP1");
+    const statusP2 = document.getElementById("statusP2");
+    const syncStatus = document.getElementById("syncStatus");
 
-    const imgClosed = "https://popcat.click/img/p.1e9d00be.png"; // ปากหุบ
-    const imgOpen = "https://popcat.click/img/op.353767c3.png";   // ปากอ้า
+    const imgClosed = "https://popcat.click/img/p.1e9d00be.png";
+    const imgOpen = "https://popcat.click/img/op.353767c3.png";
 
-    // สร้าง Web Audio Synth ทำเสียง ป็อป!
+    // ระบบสร้างเสียง Pop อัตโนมัติด้วย Web Audio API
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playPopAudio() {
+    function playPopSound() {
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(450, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.04);
+      osc.frequency.setValueAtTime(430, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.04);
       gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
       osc.connect(gain);
@@ -122,51 +173,90 @@
       osc.stop(audioCtx.currentTime + 0.05);
     }
 
-    function doPop() {
-      score++;
-      pendingClicks++;
-      scoreElement.innerText = score;
-      catPic.src = imgOpen;
-      playPopAudio();
+    // ตรวจสอบเงื่อนไขว่ากดพร้อมกัน 2 คนหรือยัง
+    function checkDualPress() {
+      if (isP1Down && isP2Down) {
+        if (!isTriggered) {
+          score++;
+          pendingClicks++;
+          scoreDisplay.innerText = score;
+          catPic.src = imgOpen;
+          playPopSound();
+          isTriggered = true; // ล็อกไว้ ต้องปล่อยปุ่มใดปุ่มหนึ่งก่อน
+        }
+      } else {
+        // เมื่อคนใดคนหนึ่งปล่อยปุ่ม ให้หุบปากแมวและปลดล็อก
+        if (isTriggered) {
+          catPic.src = imgClosed;
+          isTriggered = false;
+        }
+      }
     }
 
-    function endPop() {
-      setTimeout(() => {
-        catPic.src = imgClosed;
-      }, 70);
-    }
-
-    // รองรับทั้งระบบสัมผัสบนมือถือ และคลิกเมาส์
-    catBtn.addEventListener("pointerdown", (e) => {
+    // ควบคุมปุ่มคนซ้าย (P1)
+    btnP1.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      doPop();
+      isP1Down = true;
+      btnP1.classList.add("active");
+      statusP1.innerText = "กดแล้ว! ✓";
+      checkDualPress();
+    });
+    btnP1.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      isP1Down = false;
+      btnP1.classList.remove("active");
+      statusP1.innerText = "ยังไม่กด";
+      checkDualPress();
+    });
+    btnP1.addEventListener("pointercancel", () => {
+      isP1Down = false;
+      btnP1.classList.remove("active");
+      statusP1.innerText = "ยังไม่กด";
+      checkDualPress();
     });
 
-    catBtn.addEventListener("pointerup", (e) => {
+    // ควบคุมปุ่มคนขวา (P2)
+    btnP2.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      endPop();
+      isP2Down = true;
+      btnP2.classList.add("active");
+      statusP2.innerText = "กดแล้ว! ✓";
+      checkDualPress();
+    });
+    btnP2.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      isP2Down = false;
+      btnP2.classList.remove("active");
+      statusP2.innerText = "ยังไม่กด";
+      checkDualPress();
+    });
+    btnP2.addEventListener("pointercancel", () => {
+      isP2Down = false;
+      btnP2.classList.remove("active");
+      statusP2.innerText = "ยังไม่กด";
+      checkDualPress();
     });
 
-    // ซิงก์คะแนนขึ้น Google Sheets ทุก 2 วินาที (แบบ Batch เหมือน ESP32)
+    // ซิงก์แต้มขึ้น Google Sheets ทุก 2 วินาที (หากใส่ URL ไว้)
     setInterval(() => {
       if (pendingClicks > 0 && GAS_URL !== "YOUR_GAS_URL_HERE") {
-        const sendClicks = pendingClicks;
+        const countToSend = pendingClicks;
         pendingClicks = 0;
-        statusText.innerText = "กำลังซิงก์คะแนน...";
+        syncStatus.innerText = "กำลังซิงก์แต้ม...";
 
         fetch(GAS_URL, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            location: locationSelect.value,
-            add_clicks: sendClicks
+            location: "team_mobile",
+            add_clicks: countToSend
           })
         }).then(() => {
-          statusText.innerText = `ซิงก์สำเร็จ (+${sendClicks} แต้ม)`;
-        }).catch(err => {
-          pendingClicks += sendClicks;
-          statusText.innerText = "เน็ตมีปัญหา จะลองส่งใหม่...";
+          syncStatus.innerText = `ซิงก์สำเร็จ (+${countToSend} แต้ม)`;
+        }).catch(() => {
+          pendingClicks += countToSend;
+          syncStatus.innerText = "การเชื่อมต่อขัดข้อง";
         });
       }
     }, 2000);

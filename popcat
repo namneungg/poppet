@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pop Cat Mobile Battle</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #2b2b2b;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    .header {
+      margin-top: 25px;
+      text-align: center;
+    }
+    .score-display {
+      font-size: 3.5rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #ffe600;
+      text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .team-select {
+      margin-top: 8px;
+    }
+    select {
+      font-size: 1rem;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 2px solid #ffe600;
+      background: #1e1e1e;
+      color: #fff;
+      font-weight: bold;
+      outline: none;
+    }
+    .cat-container {
+      width: 100%;
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+    .cat-img {
+      max-width: 80%;
+      max-height: 55vh;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .status-bar {
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="score-display" id="score">0</div>
+    <div class="team-select">
+      <label for="locationId">เลือกทีม: </label>
+      <select id="locationId">
+        <option value="location_A">สถานที่ 1 (ทีม A)</option>
+        <option value="location_B">สถานที่ 2 (ทีม B)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="cat-container" id="catBtn">
+    <img id="catPic" class="cat-img" src="https://popcat.click/img/p.1e9d00be.png" alt="Pop Cat Closed">
+  </div>
+
+  <div class="status-bar" id="syncStatus">พร้อมเล่น! แตะหน้าจอเพื่อ Pop</div>
+
+  <script>
+    // ใส่ URL ของ Google Apps Script Web App ที่นี่
+    const GAS_URL = "YOUR_GAS_URL_HERE";
+
+    let score = 0;
+    let pendingClicks = 0;
+    const scoreElement = document.getElementById("score");
+    const catPic = document.getElementById("catPic");
+    const catBtn = document.getElementById("catBtn");
+    const statusText = document.getElementById("syncStatus");
+    const locationSelect = document.getElementById("locationId");
+
+    const imgClosed = "https://popcat.click/img/p.1e9d00be.png"; // ปากหุบ
+    const imgOpen = "https://popcat.click/img/op.353767c3.png";   // ปากอ้า
+
+    // สร้าง Web Audio Synth ทำเสียง ป็อป!
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playPopAudio() {
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(450, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.04);
+      gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function doPop() {
+      score++;
+      pendingClicks++;
+      scoreElement.innerText = score;
+      catPic.src = imgOpen;
+      playPopAudio();
+    }
+
+    function endPop() {
+      setTimeout(() => {
+        catPic.src = imgClosed;
+      }, 70);
+    }
+
+    // รองรับทั้งระบบสัมผัสบนมือถือ และคลิกเมาส์
+    catBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      doPop();
+    });
+
+    catBtn.addEventListener("pointerup", (e) => {
+      e.preventDefault();
+      endPop();
+    });
+
+    // ซิงก์คะแนนขึ้น Google Sheets ทุก 2 วินาที (แบบ Batch เหมือน ESP32)
+    setInterval(() => {
+      if (pendingClicks > 0 && GAS_URL !== "YOUR_GAS_URL_HERE") {
+        const sendClicks = pendingClicks;
+        pendingClicks = 0;
+        statusText.innerText = "กำลังซิงก์คะแนน...";
+
+        fetch(GAS_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location: locationSelect.value,
+            add_clicks: sendClicks
+          })
+        }).then(() => {
+          statusText.innerText = `ซิงก์สำเร็จ (+${sendClicks} แต้ม)`;
+        }).catch(err => {
+          pendingClicks += sendClicks;
+          statusText.innerText = "เน็ตมีปัญหา จะลองส่งใหม่...";
+        });
+      }
+    }, 2000);
+  </script>
+</body>
+</html>
